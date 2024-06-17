@@ -51,11 +51,11 @@ config = GPTNeoConfig()
 #our numpy mix torch model
 my_model = GPTNeoForCausalLM(config)
 #whether to save weight into binary file
-save_weights_and_biases = False
+save_weights_and_biases = True
 save_path = "/work/zhang-capra/users/ky427/allo/GPTneo/weights_and_biases/"
 #initialize our numpy mix torch model with real weight
-# my_model = initialize_model(hf_model, my_model, save_weights_and_biases, save_path)
-my_model = initialize_model_from_saved_files(my_model, save_path)#test load weight from our saved files
+my_model = initialize_model(hf_model, my_model, save_weights_and_biases, save_path)
+# my_model = initialize_model_from_saved_files(my_model, save_path)#test load weight from our saved files
 my_model.to(device)
 
 # input tokens
@@ -65,11 +65,10 @@ inputs = tokenizer(input_text, return_tensors='pt')
 if tokenizer.pad_token_id is None:
     tokenizer.pad_token_id = tokenizer.eos_token_id
     
-max_length = 128
+max_length = 64
 input_ids = inputs['input_ids']
 attention_mask = inputs['attention_mask']
 
-max_length=128
 #padding
 if input_ids.shape[1] > max_length:
     input_ids = input_ids[:, :max_length]
@@ -84,4 +83,4 @@ else:
 input_ids = input_ids.to(device)
 
 # generate text
-outputs = generate_text(my_model, tokenizer, input_ids, attention_mask=attention_mask, max_length=50, pad_token_id=tokenizer.eos_token_id)
+outputs = generate_text(my_model, tokenizer, input_ids, attention_mask=attention_mask, max_length=30, pad_token_id=tokenizer.eos_token_id)

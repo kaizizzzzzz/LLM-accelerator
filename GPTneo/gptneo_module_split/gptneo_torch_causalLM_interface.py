@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from gptneo_transformer_numpy import GPTNeoBlock
+# from gptneo_transformer_numpy import GPTNeoBlock
+from gptneo_transformer_numpy_replace import GPTNeoBlock
 
 "GPTNeoBlock is the numpy/fpga part"
 ""

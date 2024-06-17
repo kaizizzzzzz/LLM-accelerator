@@ -17,11 +17,66 @@ def layer_norm(x, weight, bias):
     # breakpoint()
     return (x - mean) / (std + 1e-5) * weight + bias
 
-def softmax(x, axis=None):
-    x = x - np.max(x, axis=axis, keepdims=True)
-    # breakpoint()
-    exp_x = np.exp(x)
-    return exp_x / np.sum(exp_x, axis=axis, keepdims=True)
+# def softmax(x, axis=None):
+#     x = x - np.max(x, axis=axis, keepdims=True) #must have
+#     # breakpoint()
+#     exp_x = np.exp(x)
+#     return exp_x / np.sum(exp_x, axis=axis, keepdims=True)
+
+"Have a large extend to optimize!!!"
+def mask_softmax(x, actual_length, axis=None): #apply identical casual and attention mask here
+    "Apply identical casual and attention mask here"
+
+    fix_length = x.shape[-1]
+    x_new = np.zeros_like(x)[0]
+
+    for h in range(x_new.shape[0]): #sequential for head
+        x_new_head = x[0][h]
+        store_x_head_exp = np.zeros_like(x_new_head)
+        x_new_row_sum = np.zeros(fix_length)
+        x_new_row_max = np.array([-10000000] * fix_length, dtype=np.float32) #large enough
+
+        "find max value in meaningful tows"
+        for i in range(x_new.shape[1]):
+            for j in range(x_new.shape[2]):
+                if i >= j:
+                    if i >= fix_length - actual_length: 
+                        if j >= fix_length - actual_length: #the right bottom corner
+                            x_new_row_max[i] = max(x_new_row_max[i], x_new_head[i,j])
+
+
+        "sum"
+        for i in range(x_new.shape[1]):
+            for j in range(x_new.shape[2]):
+                if i >= j:
+                    if i >= fix_length - actual_length: 
+                        if j >= fix_length - actual_length: #the right bottom corner
+                            store_x_head_exp[i,j] = np.exp(x_new_head[i,j] - x_new_row_max[i])
+                            x_new_row_sum[i] += store_x_head_exp[i,j]
+                            
+                        else:
+                            pass # zero
+                    else:
+                        x_new[h,i,j] = 1 / (i+1+actual_length)
+                else:
+                    if i < fix_length - actual_length and j >= fix_length - actual_length:
+                        x_new[h,i,j] = 1 / (i+1+actual_length)
+                    else:
+                        pass # zero
+
+        
+        "update"
+        for i in range(x_new.shape[1]):
+            for j in range(x_new.shape[2]):
+                if i >= j:
+                    if i >= fix_length - actual_length: 
+                        if j >= fix_length - actual_length: #the right bottom corner
+                            if x_new_row_sum[i] == 0:
+                                print("denominator is zero!")
+                                breakpoint()
+                            x_new[h,i,j] = store_x_head_exp[i,j] / x_new_row_sum[i]
+    x[0] = x_new          
+    return x
 
 def gelu(x):
     return 0.5 * x * (1 + np.tanh(0.797885 * (x + 0.044715 * x**3)))
@@ -56,23 +111,29 @@ class GPTNeoSelfAttention:
         #don't scale
         # attn_weights = attn_weights / / np.sqrt(self.head_dim)   
 
-        "can be better replaced with computation more friendly to fpga"
         # causal mask
-        causal_mask = np.tril(np.ones((seq_len, seq_len), dtype=bool)).reshape(1, 1, seq_len, seq_len)
-        mask_value = np.finfo(attn_weights.dtype).min
-        attn_weights = np.where(causal_mask, attn_weights, mask_value)
+        # causal_mask = np.tril(np.ones((seq_len, seq_len), dtype=bool)).reshape(1, 1, seq_len, seq_len)
+        # mask_value = np.finfo(attn_weights.dtype).min
+        # attn_weights_true = np.where(causal_mask, attn_weights, mask_value)
+        # # breakpoint()
+        # # padding mask
+        # if attention_mask is not None:
+        #     extended_attention_mask = attention_mask[:, None, None, :]
+        #     extended_attention_mask = (1.0 - extended_attention_mask) * mask_value
+        #     with warnings.catch_warnings():
+        #         warnings.filterwarnings("ignore", category=RuntimeWarning, message="overflow encountered in add")
+        #         attn_weights_true += extended_attention_mask
         # breakpoint()
-        # padding mask
-        if attention_mask is not None:
-            extended_attention_mask = attention_mask[:, None, None, :]
-            extended_attention_mask = (1.0 - extended_attention_mask) * mask_value
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=RuntimeWarning, message="overflow encountered in add")
-                attn_weights += extended_attention_mask
-        breakpoint()
-        attn_weights = softmax(attn_weights, axis=-1)
-        breakpoint()
-        "can be better replaced with computation more friendly to fpga"
+        # attn_weights_true = softmax(attn_weights_true, axis=-1)
+        # breakpoint()
+        "reaplaced with allo and FPGA friendly casual and attention mask"
+        actual_length = attention_mask.sum()
+        attn_weights = mask_softmax(attn_weights, actual_length, axis=-1)
+        "reaplaced with allo and FPGA friendly casual and attention mask"
+        # if not np.allclose(attn_weights, attn_weights_true, atol=1e-5):
+        #     print("attn_weights and attn_weights_true are not close enough!")
+        #     breakpoint()
+
         
         attn_output = np.matmul(attn_weights, v)
         attn_output = attn_output.transpose(0, 2, 1, 3).reshape(batch_size, seq_len, hidden_size)
