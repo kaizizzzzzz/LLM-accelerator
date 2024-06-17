@@ -3,6 +3,7 @@ from gptneo_torch_causalLM_interface import GPTNeoForCausalLM
 from load_weight_matrix import initialize_model, initialize_model_from_saved_files
 import torch
 import torch.nn.functional as F
+import time
 
 # define model configuration
 class GPTNeoConfig:
@@ -21,6 +22,7 @@ def generate_text(model, tokenizer, input_ids, attention_mask=None, max_length=5
     print(f"\ninput: {input_text}\n")
     print(f"Generating:")
     print(input_text, end="", flush=True)
+    time_start = time.time()
     for _ in range(max_length):
         outputs = model(input_ids=input_ids, attention_mask=attention_mask)
         next_token_logits = outputs[:, -1, :]
@@ -36,6 +38,8 @@ def generate_text(model, tokenizer, input_ids, attention_mask=None, max_length=5
         if pad_token_id is not None and next_token.item() == pad_token_id:
             break
     print("")
+    time_end = time.time()
+    print(f"\nInference speed: {(time_end - time_start)/max_length} seconds per token")
     return generated
 
 # define 
