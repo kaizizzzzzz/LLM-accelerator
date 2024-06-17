@@ -64,13 +64,11 @@ def mask_softmax_per_head(x_h, actual_length, fix_length): #apply identical casu
             if i >= j:
                 if i >= fix_length - actual_length: 
                     if j >= fix_length - actual_length: #the right bottom corner
-                        if x_new_row_sum[i] == 0:
-                            print("denominator is zero!")
-                            breakpoint()
                         x_new[i,j] = store_x_exp[i,j] / x_new_row_sum[i]
     x = x_new          
     return x
 
+"pass"
 def gelu(x):
     return 0.5 * x * (1 + np.tanh(0.797885 * (x + 0.044715 * x**3)))
     
