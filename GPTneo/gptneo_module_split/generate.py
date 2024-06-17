@@ -1,6 +1,6 @@
 from transformers import GPT2Tokenizer, GPTNeoForCausalLM as HFGPTNeoForCausalLM
 from gptneo_torch_causalLM_interface import GPTNeoForCausalLM
-from load_weight_matrix import initialize_model
+from load_weight_matrix import initialize_model, initialize_model_from_saved_files
 import torch
 import torch.nn.functional as F
 
@@ -22,14 +22,17 @@ def generate_text(model, tokenizer, input_ids, attention_mask=None, max_length=5
     print(f"Generating:")
     print(input_text, end="", flush=True)
     for _ in range(max_length):
-        outputs = model(input_ids=generated, attention_mask=attention_mask)
+        outputs = model(input_ids=input_ids, attention_mask=attention_mask)
         next_token_logits = outputs[:, -1, :]
         next_token = torch.argmax(next_token_logits, dim=-1).unsqueeze(-1)
         next_text = tokenizer.decode(next_token[0], skip_special_tokens=True)
         print(next_text, end="", flush=True)
         generated = torch.cat((generated, next_token), dim=1)
 
-        attention_mask = F.pad(attention_mask, (0, 1), value=1)
+        #update pad with fixed length
+        input_ids[0] = torch.cat([input_ids[0][1:], next_token[0]])
+        attention_mask[0] = torch.cat([attention_mask[0][1:], torch.tensor([1]).to(device)])
+        # print(f"attention_mask length: {attention_mask[0].shape[0]}, input_ids length: {input_ids[0].shape[0]} ")
         if pad_token_id is not None and next_token.item() == pad_token_id:
             break
     print("")
@@ -45,13 +48,14 @@ config = GPTNeoConfig()
 my_model = GPTNeoForCausalLM(config)
 #whether to save weight into binary file
 save_weights_and_biases = False
-save_path = "/work/zhang-capra/users/ky427/allo/GPTneo"
+save_path = "/work/zhang-capra/users/ky427/allo/GPTneo/weights_and_biases/"
 #initialize our numpy mix torch model with real weight
-my_model = initialize_model(hf_model, my_model, save_weights_and_biases, save_path)
+# my_model = initialize_model(hf_model, my_model, save_weights_and_biases, save_path)
+my_model = initialize_model_from_saved_files(my_model, save_path)#test load weight from our saved files
 my_model.to(device)
 
 # input tokens
-input_text = "Image classification is one of the technology in computer vision. It"
+input_text = "FPGA is a great accelerator for deep learning models. It"
 inputs = tokenizer(input_text, return_tensors='pt')
 
 if tokenizer.pad_token_id is None:

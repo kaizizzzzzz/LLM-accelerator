@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 "The transformer block of GPT-Neo implemented in sole numpy"
 "Which can be replaced by our fpga accelerator"
@@ -64,7 +65,9 @@ class GPTNeoSelfAttention:
         if attention_mask is not None:
             extended_attention_mask = attention_mask[:, None, None, :]
             extended_attention_mask = (1.0 - extended_attention_mask) * mask_value
-            attn_weights += extended_attention_mask
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning, message="overflow encountered in add")
+                attn_weights += extended_attention_mask
         # breakpoint()
         attn_weights = softmax(attn_weights, axis=-1)
 

@@ -213,6 +213,7 @@ def generate_text(model, input_ids, attention_mask=None, max_length=50, pad_toke
         next_token = torch.argmax(next_token_logits, dim=-1).unsqueeze(-1)
         
         generated = torch.cat((generated, next_token), dim=1)
+        #update pad with fixed length
         input_ids[0] = torch.cat([input_ids[0][1:], next_token[0]])
         attention_mask[0] = torch.cat([attention_mask[0][1:], torch.tensor([1]).to(device)])
         if pad_token_id is not None and next_token.item() == pad_token_id:
