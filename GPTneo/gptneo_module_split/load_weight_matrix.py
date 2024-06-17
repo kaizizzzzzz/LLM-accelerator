@@ -29,18 +29,20 @@ def initialize_model(hf_model=None, my_model=None, save_model=False, save_path=N
     #transformer weight
     for my_layer, hf_layer in zip(my_model.transformer.h, hf_model.transformer.h):
         # breakpoint()
-        my_layer.attn.q_proj_weight = hf_layer.attn.attention.q_proj.weight.data.numpy()
-        my_layer.attn.k_proj_weight = hf_layer.attn.attention.k_proj.weight.data.numpy()
-        my_layer.attn.v_proj_weight = hf_layer.attn.attention.v_proj.weight.data.numpy()
-        my_layer.attn.out_proj_weight = hf_layer.attn.attention.out_proj.weight.data.numpy()
+        "We transpose some Linear layer weight matrix here because we don't want to do X @ W.T in our FPGA"
+        "So we do here in advance"
+        my_layer.attn.q_proj_weight = hf_layer.attn.attention.q_proj.weight.data.numpy().T
+        my_layer.attn.k_proj_weight = hf_layer.attn.attention.k_proj.weight.data.numpy().T
+        my_layer.attn.v_proj_weight = hf_layer.attn.attention.v_proj.weight.data.numpy().T
+        my_layer.attn.out_proj_weight = hf_layer.attn.attention.out_proj.weight.data.numpy().T
         my_layer.attn.out_proj_bias = hf_layer.attn.attention.out_proj.bias.data.numpy()
         my_layer.ln1_weight = hf_layer.ln_1.weight.data.numpy()
         my_layer.ln1_bias = hf_layer.ln_1.bias.data.numpy()
         my_layer.ln2_weight = hf_layer.ln_2.weight.data.numpy()
         my_layer.ln2_bias = hf_layer.ln_2.bias.data.numpy()
-        my_layer.mlp_fc_weight = hf_layer.mlp.c_fc.weight.data.numpy()
+        my_layer.mlp_fc_weight = hf_layer.mlp.c_fc.weight.data.numpy().T
         my_layer.mlp_fc_bias = hf_layer.mlp.c_fc.bias.data.numpy()
-        my_layer.mlp_proj_weight = hf_layer.mlp.c_proj.weight.data.numpy()
+        my_layer.mlp_proj_weight = hf_layer.mlp.c_proj.weight.data.numpy().T
         my_layer.mlp_proj_bias = hf_layer.mlp.c_proj.bias.data.numpy()
 
         if save_model:

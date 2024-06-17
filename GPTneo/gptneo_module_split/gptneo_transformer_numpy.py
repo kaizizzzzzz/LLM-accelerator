@@ -5,7 +5,8 @@ import warnings
 "Which can be replaced by our fpga accelerator"
 
 def linear(x, weight, bias=None):
-    y = np.dot(x, weight.T)  # transpose to conform torch linear
+    # y = np.dot(x, weight.T)
+    y = np.dot(x, weight)  # transpose to conform torch linear, we transpose the weight matrix in advance
     if bias is not None:
         y += bias
     return y
@@ -86,9 +87,13 @@ class GPTNeoBlock:
         self.attn = GPTNeoSelfAttention(config)
         self.ln2_weight = np.ones(config.hidden_size, dtype=np.float32)
         self.ln2_bias = np.zeros(config.hidden_size, dtype=np.float32)
-        self.mlp_fc_weight = np.random.randn(config.intermediate_size, config.hidden_size).astype(np.float32)
+        "We transpose in advance, pay attention to the unflatten shape!"
+        # self.mlp_fc_weight = np.random.randn(config.intermediate_size, config.hidden_size).astype(np.float32)
+        self.mlp_fc_weight = np.random.randn(config.hidden_size, config.intermediate_size).astype(np.float32)
         self.mlp_fc_bias = np.zeros(config.intermediate_size).astype(np.float32)
-        self.mlp_proj_weight = np.random.randn(config.hidden_size, config.intermediate_size).astype(np.float32)
+        "We transpose in advance, pay attention to the unflatten shape!"
+        # self.mlp_proj_weight = np.random.randn(config.hidden_size, config.intermediate_size).astype(np.float32)
+        self.mlp_proj_weight = np.random.randn(config.intermediate_size, config.hidden_size).astype(np.float32)
         self.mlp_proj_bias = np.zeros(config.hidden_size).astype(np.float32)
 
     def forward(self, x, attention_mask=None):
@@ -102,6 +107,7 @@ class GPTNeoBlock:
         mlp_output = linear(x_ln2, self.mlp_fc_weight, self.mlp_fc_bias)   
         mlp_output = gelu(mlp_output)  # GELU 
         mlp_output = linear(mlp_output, self.mlp_proj_weight, self.mlp_proj_bias)  
-        mlp_output = mlp_output.reshape(x.shape[0], -1, self.mlp_proj_weight.shape[0])  # restore the shape
+        # breakpoint()
+        # mlp_output = mlp_output.reshape(x.shape[0], -1, self.mlp_proj_weight.shape[0])  # restore the shape
         x = x + mlp_output
         return x
