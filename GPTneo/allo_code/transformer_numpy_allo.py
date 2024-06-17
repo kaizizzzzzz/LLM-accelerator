@@ -11,139 +11,109 @@ def linear(x, weight, bias=None):
         y += bias
     return y
 
-def layer_norm(x, weight, bias):
-    mean = x.mean(-1, keepdims=True)
-    std = x.std(-1, keepdims=True)
-    # breakpoint()
-    return (x - mean) / (std + 1e-5) * weight + bias
+def np_layernorm(inp, gamma, beta): #replaced with allo "Right[Yes]"
+    mean = inp.mean(axis=1)
+    mean2 = (inp**2).mean(axis=1)
+    var = mean2 - mean**2
+    np_out = gamma * (inp - mean[:, None]) / np.sqrt(var[:, None] + 1e-5) + beta
+    return np_out
 
 "Have a large extend to optimize!!!"
-def mask_softmax(x, actual_length, axis=None): #apply identical casual and attention mask here
+def mask_softmax_per_head(x_h, actual_length, fix_length): #apply identical casual and attention mask here
     "Apply identical casual and attention mask here"
 
-    fix_length = x.shape[-1]
-    x_new = np.zeros_like(x)[0]
+    "x_h shape is [fix_length, fix_length], no head dimension"
 
-    for h in range(x_new.shape[0]): #sequential for head
-        x_new_head = x[0][h]
-        store_x_head_exp = np.zeros_like(x_new_head)
-        x_new_row_sum = np.zeros(fix_length)
-        x_new_row_max = np.array([-10000] * fix_length, dtype=np.float32) #large enough
+    x_new = np.zeros((fix_length,fix_length), dtype=np.float32)
+    store_x_exp = np.zeros((fix_length,fix_length), dtype=np.float32)
+    x_new_row_sum = np.zeros(fix_length, dtype=np.float32)
+    x_new_row_max = np.array([-10000] * fix_length, dtype=np.float32) #large enough
 
-        "find max value in meaningful tows"
-        for i in range(x_new.shape[1]):
-            for j in range(x_new.shape[2]):
-                if i >= j:
-                    if i >= fix_length - actual_length: 
-                        if j >= fix_length - actual_length: #the right bottom corner
-                            x_new_row_max[i] = max(x_new_row_max[i], x_new_head[i,j])
+    "find max value in meaningful tows"
+    for i in range(fix_length):
+        for j in range(fix_length):
+            if i >= j:
+                if i >= fix_length - actual_length: 
+                    if j >= fix_length - actual_length: #the right bottom corner
+                        x_new_row_max[i] = max(x_new_row_max[i], x_h[i,j])
 
 
-        "sum"
-        for i in range(x_new.shape[1]):
-            for j in range(x_new.shape[2]):
-                if i >= j:
-                    if i >= fix_length - actual_length: 
-                        if j >= fix_length - actual_length: #the right bottom corner
-                            store_x_head_exp[i,j] = np.exp(x_new_head[i,j] - x_new_row_max[i])
-                            x_new_row_sum[i] += store_x_head_exp[i,j]
-                            
-                        else:
-                            pass # zero
-                    else:
-                        x_new[h,i,j] = 1 / (i+1+actual_length)
-                else:
-                    if i < fix_length - actual_length and j >= fix_length - actual_length:
-                        x_new[h,i,j] = 1 / (i+1+actual_length)
+    "sum"
+    for i in range(fix_length):
+        for j in range(fix_length):
+            if i >= j:
+                if i >= fix_length - actual_length: 
+                    if j >= fix_length - actual_length: #the right bottom corner
+                        store_x_exp[i,j] = np.exp(x_h[i,j] - x_new_row_max[i])
+                        x_new_row_sum[i] += store_x_exp[i,j]
+                        
                     else:
                         pass # zero
+                else:
+                    x_new[i,j] = 1 / (i+1+actual_length)
+            else:
+                if i < fix_length - actual_length and j >= fix_length - actual_length:
+                    x_new[i,j] = 1 / (i+1+actual_length)
+                else:
+                    pass # zero
 
-        
-        "update"
-        for i in range(x_new.shape[1]):
-            for j in range(x_new.shape[2]):
-                if i >= j:
-                    if i >= fix_length - actual_length: 
-                        if j >= fix_length - actual_length: #the right bottom corner
-                            if x_new_row_sum[i] == 0:
-                                print("denominator is zero!")
-                                breakpoint()
-                            x_new[h,i,j] = store_x_head_exp[i,j] / x_new_row_sum[i]
-    x[0] = x_new          
+    
+    "update"
+    for i in range(fix_length):
+        for j in range(fix_length):
+            if i >= j:
+                if i >= fix_length - actual_length: 
+                    if j >= fix_length - actual_length: #the right bottom corner
+                        if x_new_row_sum[i] == 0:
+                            print("denominator is zero!")
+                            breakpoint()
+                        x_new[i,j] = store_x_exp[i,j] / x_new_row_sum[i]
+    x = x_new          
     return x
 
 def gelu(x):
     return 0.5 * x * (1 + np.tanh(0.797885 * (x + 0.044715 * x**3)))
+    
+def sdp(Q, K, V, H, D, L, actual_length):
+    "L is the fix length"
+    context = np.zeros(Q.shape)
+    h_d = D // H
+    for i in range(H):
+        # split Q, K, V
+        Q_h = Q[:, i * h_d : (i + 1) * h_d]
+        K_h = K[:, i * h_d : (i + 1) * h_d]
+        V_h = V[:, i * h_d : (i + 1) * h_d]
+        # compute attention
+        attention = np.matmul(Q_h, K_h.T)
+        # # don't scale in GPTneo
+        # attention = attention / np.sqrt(D // H)
+        Y = mask_softmax_per_head(attention, actual_length, L)
+        context_i = np.matmul(Y, V_h)
+        context[:, i * h_d : (i + 1) * h_d] = context_i
+    return context
 
-class GPTNeoSelfAttention:
-    def __init__(self, config):
-        self.num_heads = config.num_heads
-        self.hidden_size = config.hidden_size
-        self.head_dim = self.hidden_size // self.num_heads
-        # self.scale = self.head_dim ** -0.5
+def GPTNeo_layer(X, ln1_weight, ln1_bias, q_proj_weight, k_proj_weight, v_proj_weight, out_proj_weight, out_proj_bias,
+                 ln2_weight, ln2_bias, mlp_fc_weight, mlp_fc_bias, mlp_proj_weight, mlp_proj_bias, H, D, L, actual_length):
+    "x shape is [max_seq_len, hidden_size]"
 
-        self.q_proj_weight = np.random.randn(self.hidden_size, self.hidden_size).astype(np.float32)
-        self.k_proj_weight = np.random.randn(self.hidden_size, self.hidden_size).astype(np.float32)
-        self.v_proj_weight = np.random.randn(self.hidden_size, self.hidden_size).astype(np.float32)
-        self.out_proj_weight = np.random.randn(self.hidden_size, self.hidden_size).astype(np.float32)
-        self.out_proj_bias = np.zeros(self.hidden_size).astype(np.float32)
+    X_ln1 = np_layernorm(X, ln1_weight, ln1_bias)
 
-    def forward(self, x, attention_mask=None):
-        batch_size, seq_len, hidden_size = x.shape
+    Q = linear(X_ln1, q_proj_weight)
+    K = linear(X_ln1, k_proj_weight)
+    V = linear(X_ln1, v_proj_weight)
+    # breakpoint()
 
-        q = linear(x, self.q_proj_weight)
-        k = linear(x, self.k_proj_weight)
-        v = linear(x, self.v_proj_weight)
-        # breakpoint()
+    attn = sdp(Q, K, V, H, D, L, actual_length)
+    
+    attn = linear(attn, out_proj_weight, out_proj_bias)
 
-        q = q.reshape(batch_size, seq_len, self.num_heads, self.head_dim).transpose(0, 2, 1, 3)
-        k = k.reshape(batch_size, seq_len, self.num_heads, self.head_dim).transpose(0, 2, 1, 3)
-        v = v.reshape(batch_size, seq_len, self.num_heads, self.head_dim).transpose(0, 2, 1, 3)
+    # residual
+    X = X + attn
 
-        attn_weights = np.matmul(q, k.transpose(0, 1, 3, 2)) 
+    x_ln2 = np_layernorm(X, ln2_weight, ln2_bias)
+    mlp_output = linear(x_ln2, mlp_fc_weight, mlp_fc_bias)   
+    mlp_output = gelu(mlp_output)  # GELU 
+    mlp_output = linear(mlp_output, mlp_proj_weight, mlp_proj_bias)  
 
-        #don't scale
-        # attn_weights = attn_weights / / np.sqrt(self.head_dim)   
-
-        "reaplaced with allo and FPGA friendly casual and attention mask"
-        actual_length = attention_mask.sum()
-        attn_weights = mask_softmax(attn_weights, actual_length, axis=-1)
-        "reaplaced with allo and FPGA friendly casual and attention mask"
-        
-        attn_output = np.matmul(attn_weights, v)
-        attn_output = attn_output.transpose(0, 2, 1, 3).reshape(batch_size, seq_len, hidden_size)
-        attn_output = linear(attn_output, self.out_proj_weight, self.out_proj_bias)
-
-        return attn_output
-
-class GPTNeoBlock:
-    def __init__(self, config):
-        self.ln1_weight = np.ones(config.hidden_size, dtype=np.float32)
-        self.ln1_bias = np.zeros(config.hidden_size, dtype=np.float32)
-        self.attn = GPTNeoSelfAttention(config)
-        self.ln2_weight = np.ones(config.hidden_size, dtype=np.float32)
-        self.ln2_bias = np.zeros(config.hidden_size, dtype=np.float32)
-        "We transpose in advance, pay attention to the unflatten shape!"
-        # self.mlp_fc_weight = np.random.randn(config.intermediate_size, config.hidden_size).astype(np.float32)
-        self.mlp_fc_weight = np.random.randn(config.hidden_size, config.intermediate_size).astype(np.float32)
-        self.mlp_fc_bias = np.zeros(config.intermediate_size).astype(np.float32)
-        "We transpose in advance, pay attention to the unflatten shape!"
-        # self.mlp_proj_weight = np.random.randn(config.hidden_size, config.intermediate_size).astype(np.float32)
-        self.mlp_proj_weight = np.random.randn(config.intermediate_size, config.hidden_size).astype(np.float32)
-        self.mlp_proj_bias = np.zeros(config.hidden_size).astype(np.float32)
-
-    def forward(self, x, attention_mask=None):
-        x_ln1 = layer_norm(x, self.ln1_weight, self.ln1_bias)
-        # breakpoint()
-        attn_output = self.attn.forward(x_ln1, attention_mask)
-        # breakpoint()
-        x = x + attn_output
-
-        x_ln2 = layer_norm(x, self.ln2_weight, self.ln2_bias)
-        mlp_output = linear(x_ln2, self.mlp_fc_weight, self.mlp_fc_bias)   
-        mlp_output = gelu(mlp_output)  # GELU 
-        mlp_output = linear(mlp_output, self.mlp_proj_weight, self.mlp_proj_bias)  
-        # breakpoint()
-        # mlp_output = mlp_output.reshape(x.shape[0], -1, self.mlp_proj_weight.shape[0])  # restore the shape
-        x = x + mlp_output
-        return x
+    X = X + mlp_output
+    return X

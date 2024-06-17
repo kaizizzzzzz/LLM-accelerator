@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 # from gptneo_transformer_numpy import GPTNeoBlock
-from gptneo_transformer_numpy_replace import GPTNeoBlock
-# from transformer_numpy_allo import GPTNeoBlock
+# from gptneo_transformer_numpy_replace import GPTNeoBlock
+from transformer_numpy_allo import GPTNeo_layer
 
 "GPTNeoBlock is the numpy/fpga part"
 ""
@@ -14,15 +14,18 @@ class GPTNeoModel(nn.Module):
         super().__init__()
         self.wte = nn.Embedding(config.vocab_size, config.hidden_size)
         self.wpe = nn.Embedding(config.max_position_embeddings, config.hidden_size)
-        self.h = [GPTNeoBlock(config) for _ in range(config.num_layers)]
         self.ln_f = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_epsilon)
+        self.n_layers = config.num_layers
+
+    def store_layers_weight(self, layers_weight): 
+        self.layers_weight = layers_weight
+
 
     def forward(self, input_ids, attention_mask=None):
         with torch.no_grad():
             device = input_ids.device
             input_shape = input_ids.size()
             input_ids = input_ids.view(-1, input_shape[-1])
-            batch_size = input_ids.size(0)
 
             if attention_mask is not None:
                 position_ids = attention_mask.long().cumsum(-1) - 1
@@ -38,9 +41,33 @@ class GPTNeoModel(nn.Module):
             # to numpy, then give to transformer block
             attention_mask = attention_mask.cpu().numpy() 
             hidden_states  = hidden_states.cpu().numpy() 
-            for block in self.h:
-                hidden_states = block.forward(hidden_states, attention_mask) #numpy return type
+            hidden_states = hidden_states[0] # delete batch dimension
+            
+            "naive"
+            actual_length = attention_mask.sum()
+            L=64
+            D=768
+            H=12
+            for layer in range(1, self.n_layers+1):
+                ln1_weight = self.layers_weight[layer]["ln1_weight"]
+                ln1_bias = self.layers_weight[layer]["ln1_bias"]
+                q_proj_weight = self.layers_weight[layer]["q_proj_weight"]
+                k_proj_weight = self.layers_weight[layer]["k_proj_weight"]
+                v_proj_weight = self.layers_weight[layer]["v_proj_weight"]
+                out_proj_weight = self.layers_weight[layer]["out_proj_weight"]
+                out_proj_bias = self.layers_weight[layer]["out_proj_bias"]
+                ln2_weight = self.layers_weight[layer]["ln2_weight"]
+                ln2_bias = self.layers_weight[layer]["ln2_bias"]
+                mlp_fc_weight = self.layers_weight[layer]["mlp_fc_weight"]
+                mlp_fc_bias = self.layers_weight[layer]["mlp_fc_bias"]
+                mlp_proj_weight = self.layers_weight[layer]["mlp_proj_weight"]
+                mlp_proj_bias = self.layers_weight[layer]["mlp_proj_bias"]
+                #obtain weights, don't read here, read in advance
 
+                hidden_states = GPTNeo_layer(hidden_states, ln1_weight, ln1_bias, q_proj_weight, k_proj_weight, v_proj_weight, out_proj_weight, out_proj_bias,
+                ln2_weight, ln2_bias, mlp_fc_weight, mlp_fc_bias, mlp_proj_weight, mlp_proj_bias, H, D, L, actual_length)
+
+            hidden_states = hidden_states[None,:,:]# back batch dimension
             hidden_states = torch.tensor(hidden_states, dtype=torch.float32) # back to torch tensor
             
             hidden_states = self.ln_f(hidden_states)
