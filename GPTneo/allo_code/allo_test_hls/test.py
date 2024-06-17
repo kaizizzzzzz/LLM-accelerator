@@ -141,8 +141,7 @@ def test_gelu():
     print(s.build(target="vhls"))
 
 
-
-def sdp(Q, K, V, H, D, L, actual_length):
+def causal_sdp(Q, K, V, H, D, L, actual_length):
     "L is the fix length"
     context = np.zeros(Q.shape)
     h_d = D // H
@@ -155,36 +154,38 @@ def sdp(Q, K, V, H, D, L, actual_length):
         attention = np.matmul(Q_h, K_h.T)
         # # don't scale in GPTneo
         # attention = attention / np.sqrt(D // H)
-        Y = mask_softmax_per_head(attention, actual_length, L)
+        Y = mask_softmax_per_head_np(attention, actual_length, L)
         context_i = np.matmul(Y, V_h)
         context[:, i * h_d : (i + 1) * h_d] = context_i
     return context
 
-def test_sdp():
-    from allo.library.nn import scaled_dot_product_attention
+"Passed!"
+def test_causal_sdp():
+    from allo.library.nn import masked_casual_dot_product_attention, mask_softmax_per_head
     from allo.library.systolic import systolic
 
-    M0, M1 = 2, 2
-    H, L, D = 12, 8, 8
+    M0, M1 = 8, 8
+    H, L, D = 12, 64, 768
     s = allo.customize(
-        scaled_dot_product_attention, instantiate=[float32, H, L, D, M0, M1]
+        masked_casual_dot_product_attention, instantiate=[float32, H, L, D, M0, M1]
     )
     mod = s.build()
     Q = np.random.randn(L, D).astype(np.float32)
     K = np.random.randn(L, D).astype(np.float32)
     V = np.random.randn(L, D).astype(np.float32)
-    allo_out = mod(Q, K, V)
-    np_out = sdp(Q, K, V, H, D)
+    actual_length = np.array([12,12],dtype=np.int32) #fake
+    allo_out = mod(Q, K, V, actual_length)
+    np_out = causal_sdp(Q, K, V, H, D, L, actual_length[0])
     np.testing.assert_allclose(allo_out, np_out, atol=1e-3)
-    print("Passed!")
+    print("allo Passed!")
     s.compose(systolic, id="QKT", instantiate=[float32, float32, float32, L, D, D, M0, M1])
     s.compose(systolic, id="YV", instantiate=[float32, float32, float32, L, D, D, M0, M1])
-    hls_mod = s.build(target="vitis_hls",mode="csim", project="sdp_small.prj")
-    breakpoint()
+    s.compose(mask_softmax_per_head, id="sft_Y" ,instantiate=[float32, L])
+    hls_mod = s.build(target="vitis_hls",mode="csim", project="causal_sdp.prj")
     csim_C = np.zeros((L , D), dtype=np.float32)
-    hls_mod(Q,K,V,csim_C)
+    hls_mod(Q,K,V, actual_length,csim_C)
     np.testing.assert_allclose(allo_out, csim_C, atol=1e-3)
-
+    print("Csim Passed!")
 
 def test_bert():
     from allo.library.systolic import systolic
@@ -319,4 +320,5 @@ if __name__ == "__main__":
     # pytest.main([__file__])
     # test_linear()
     # test_bert()
-    test_mask_softmax_per_head()
+    # test_mask_softmax_per_head()
+    test_causal_sdp()

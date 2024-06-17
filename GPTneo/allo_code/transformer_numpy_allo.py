@@ -72,7 +72,7 @@ def mask_softmax_per_head(x_h, actual_length, fix_length): #apply identical casu
 def gelu(x):
     return 0.5 * x * (1 + np.tanh(0.797885 * (x + 0.044715 * x**3)))
     
-def sdp(Q, K, V, H, D, L, actual_length):
+def causal_sdp(Q, K, V, H, D, L, actual_length):
     "L is the fix length"
     context = np.zeros(Q.shape)
     h_d = D // H
@@ -101,7 +101,7 @@ def GPTNeo_layer(X, ln1_weight, ln1_bias, q_proj_weight, k_proj_weight, v_proj_w
     V = linear(X_ln1, v_proj_weight)
     # breakpoint()
 
-    attn = sdp(Q, K, V, H, D, L, actual_length)
+    attn = causal_sdp(Q, K, V, H, D, L, actual_length)
     
     attn = linear(attn, out_proj_weight, out_proj_bias)
 
