@@ -1,0 +1,74 @@
+{
+    "name": "bias_add",
+    "description": [
+        "Allo generated kernels"
+    ],
+    "flow": "vitis",
+    "keywords": [],
+    "key_concepts": [],
+    "platform_blocklist": [
+        "nodma"
+    ],
+    "os": [
+        "Linux"
+    ],
+    "runtime": [
+        "OpenCL"
+    ],
+    "host": {
+        "host_exe": "bias_add",
+        "compiler": {
+            "sources": [
+                "xcl2.cpp",
+                "host.cpp"
+            ],
+            "includepaths": [
+                "."
+            ]
+        }
+    },
+    "containers": [
+        {
+            "accelerators": [
+                {
+                    "name": "bias_add",
+                    "location": "kernel.cpp"
+                }
+            ],
+            "name": "bias_add",
+            "ldclflags": "--optimize 3  --kernel_frequency 300"
+        }
+    ],
+    "launch": [
+        {
+            "cmd_args": "BUILD/bias_add.xclbin",
+            "name": "generic launch for all flows"
+        }
+    ],
+    "contributors": [
+        {
+            "url": "https://github.com/cornell-zhang/allo",
+            "group": "Allo"
+        }
+    ],
+    "testinfo": {
+        "disable": false,
+        "profile": "no",
+        "jobs": [
+            {
+                "index": 0,
+                "dependency": [],
+                "env": "",
+                "cmd": "",
+                "max_memory_MB": 32768,
+                "max_time_min": 300
+            }
+        ],
+        "targets": [
+            "vitis_sw_emu",
+            "vitis_hw_emu",
+            "vitis_hw"
+        ],
+        "category": "canary"
+    }
+}

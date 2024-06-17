@@ -4,3 +4,4 @@
 4. Finish allo numpy code for transformer part! Now GPTneo can inference!
 5. Mask softmax passed Csim!
 6. Casual sdp passed Csim!
+7. bias_add passed Csim!

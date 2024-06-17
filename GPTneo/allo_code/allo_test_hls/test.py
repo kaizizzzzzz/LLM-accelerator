@@ -102,6 +102,23 @@ def test_mask_softmax_per_head():
     np.testing.assert_allclose(np_out, csim_C, atol=1e-3)
     print("Csim Passed!")
 
+"passed!"
+def test_bias_add():
+    from allo.library.nn import bias_add
+    L, D = 64, 768
+    s = allo.customize(bias_add, instantiate=[float32, L, D])
+    mod = s.build()
+    inp = np.random.randn(L, D).astype(np.float32)
+    bias = np.random.randn(D).astype(np.float32)
+    allo_out = mod(inp, bias)
+    np_out = inp + bias
+    np.testing.assert_allclose(allo_out, np_out, atol=1e-3)
+    print("Passed!")
+    hls_mod = s.build(target="vitis_hls",mode="csim", project="bias_add.prj")
+    csim_C = np.zeros((L , D), dtype=np.float32)
+    hls_mod(inp,bias,csim_C)
+    np.testing.assert_allclose(np_out, csim_C, atol=1e-3)
+    print("Csim Passed!")
 
 def np_layernorm(inp, gamma, beta):
     mean = inp.mean(axis=1)
@@ -187,7 +204,7 @@ def test_causal_sdp():
     np.testing.assert_allclose(allo_out, csim_C, atol=1e-3)
     print("Csim Passed!")
 
-def test_bert():
+def test_GPTneo():
     from allo.library.systolic import systolic
     from allo.library.nn import (
         scaled_dot_product_attention,
@@ -197,128 +214,37 @@ def test_bert():
         softmax,
     )
 
-    H, L, D, Dffn = 2, 8, 8, 16
-    M0, M1 = 2, 2
+    def GPTNeo_layer(X, ln1_weight, ln1_bias, q_proj_weight, k_proj_weight, v_proj_weight, 
+                     out_proj_weight, out_proj_bias,ln2_weight, ln2_bias, mlp_fc_weight, mlp_fc_bias, 
+                     mlp_proj_weight, mlp_proj_bias, H, D, L, actual_length):
+        "x shape is [max_seq_len, hidden_size]"
 
-    def BertLayer[
-        Ty, H, L, D, Dffn, M0, M1
-    ](
-        X: "Ty[L, D]",
-        Wq: "Ty[D, D]",
-        Wk: "Ty[D, D]",
-        Wv: "Ty[D, D]",
-        Wp: "Ty[D, D]",
-        W1: "Ty[D, Dffn]",
-        W2: "Ty[Dffn, D]",
-        gamma1: "Ty[D]",
-        beta1: "Ty[D]",
-        gamma2: "Ty[D]",
-        beta2: "Ty[D]",
-    ) -> "Ty[L, D]":
-        # 1. Bert Attention
-        # 1.0 project Q, K, V
-        Q: Ty[L, D] = 0
-        K: Ty[L, D] = 0
-        V: Ty[L, D] = 0
-        systolic[Ty, Ty, Ty, L, D, D, M0, M1, "Q"](X, Wq, Q)
-        systolic[Ty, Ty, Ty, L, D, D, M0, M1, "K"](X, Wk, K)
-        systolic[Ty, Ty, Ty, L, D, D, M0, M1, "V"](X, Wv, V)
-        # 1.1 self attention
-        attn = scaled_dot_product_attention[Ty, H, L, D, M0, M1](Q, K, V)
-        # 1.2 output dense
-        O_proj: Ty[L, D] = 0
-        systolic[Ty, Ty, Ty, L, D, D, M0, M1, "P"](attn, Wp, O_proj)
-        # 1.3 Residual layer
-        res_attn = residual_add[Ty, L, D, "res_attn"](O_proj, X)
-        # 1.4 layer norm
-        ln = layer_norm[Ty, L, D, "ln1"](res_attn, gamma1, beta1)
-        # 2. Feed Forward Network
-        # 2.1 ffn dense 1
-        ffn1: Ty[L, Dffn] = 0
-        systolic[Ty, Ty, Ty, L, D, Dffn, M0, M1, "ffn1"](ln, W1, ffn1)
-        # 2.2 gelu layer
-        gelu_outp = GeLU[Ty, L, Dffn](ffn1)
-        # 2.3 ffn dense 2
-        ffn2: Ty[L, D] = 0
-        systolic[Ty, Ty, Ty, L, Dffn, D, M0, M1, "ffn2"](gelu_outp, W2, ffn2)
-        # 2.4 Residual layer
-        res_ffn = residual_add[Ty, L, D, "res_ffn"](ffn2, ln)
-        # 2.5 layer norm
-        ffn_ln_outp = layer_norm[Ty, L, D, "ln2"](res_ffn, gamma2, beta2)
-        return ffn_ln_outp
+        X_ln1 = np_layernorm(X, ln1_weight, ln1_bias)
+        
+        Q = np.matmul(X_ln1, q_proj_weight)
+        K = np.matmul(X_ln1, k_proj_weight)
+        V = np.matmul(X_ln1, v_proj_weight)
+        # breakpoint()
 
-    s = allo.customize(
-        BertLayer,
-        instantiate=[float32, H, L, D, Dffn, M0, M1],
-    )
-    mod = s.build()
-    X = np.random.randn(L, D).astype(np.float32)
-    # weights are supposed to be transposed
-    Wq = np.random.randn(D, D).astype(np.float32)
-    Wk = np.random.randn(D, D).astype(np.float32)
-    Wv = np.random.randn(D, D).astype(np.float32)
-    Wp = np.random.randn(D, D).astype(np.float32)
-    W1 = np.random.randn(D, Dffn).astype(np.float32)
-    W2 = np.random.randn(Dffn, D).astype(np.float32)
-    gamma1 = np.random.randn(D).astype(np.float32)
-    beta1 = np.random.randn(D).astype(np.float32)
-    gamma2 = np.random.randn(D).astype(np.float32)
-    beta2 = np.random.randn(D).astype(np.float32)
-    allo_out = mod(X, Wq, Wk, Wv, Wp, W1, W2, gamma1, beta1, gamma2, beta2)
-    s.compose(systolic, instantiate=[float32, float32, float32, L, D, D, M0, M1], id="Q")
-    s.compose(systolic, instantiate=[float32, float32, float32, L, D, D, M0, M1], id="K")
-    s.compose(systolic, instantiate=[float32, float32, float32, L, D, D, M0, M1], id="V")
-    s.compose(systolic, instantiate=[float32, float32, float32, L, D, D, M0, M1], id="P")
-    s.compose(systolic, instantiate=[float32, float32, float32, L, D, Dffn, M0, M1], id="ffn1")
-    s.compose(systolic, instantiate=[float32, float32, float32, L, Dffn, D, M0, M1], id="ffn2")
-    s.compose(systolic, id="QKT", instantiate=[float32, float32, float32, L, D, D, M0, M1])
-    s.compose(systolic, id="YV", instantiate=[float32, float32, float32, L, D, D, M0, M1])
-    s.compose(softmax, id="sft_Y" ,instantiate=[float32, L])
-    hls_mod = s.build(target="vitis_hls",mode="csim", project="bert_vitis.prj")
-    csim_C = np.zeros((L , D), dtype=np.float32)
-    hls_mod(X,Wq,Wk,Wv,Wp,W1,W2,gamma1,beta1,gamma2,beta2,csim_C)
-    breakpoint()
+        attn = causal_sdp(Q, K, V, H, D, L, actual_length)
+        
+        attn = linear(attn, out_proj_weight, out_proj_bias)
 
-    def bert_layer(X, Wq, Wk, Wv, Wp, W1, W2, gamma1, beta1, gamma2, beta2):
-        # 1. Bert Attention
-        # 1.0 project Q, K, V
-        Q = np.matmul(X, Wq)
-        K = np.matmul(X, Wk)
-        V = np.matmul(X, Wv)
-        # 1.1 self attention
-        attn = sdp(Q, K, V, H, D)
-        # 1.2 output dense
-        O_proj = np.matmul(attn, Wp)
-        # 1.3 Residual layer
-        res_attn = O_proj + X
-        # 1.4 layer norm
-        ln = np_layernorm(res_attn, gamma1, beta1)
-        # 2. Feed Forward Network
-        # 2.1 ffn dense 1
-        ffn1 = np.matmul(ln, W1)
-        # 2.2 gelu layer
-        gelu_outp = 0.5 * ffn1 * (1 + np.tanh(0.797885 * (ffn1 + 0.044715 * ffn1**3)))
-        # 2.3 ffn dense 2
-        ffn2 = np.matmul(gelu_outp, W2)
-        # 2.4 Residual layer
-        res_ffn = ffn2 + ln
-        # 2.5 layer norm
-        ffn_ln_outp = np_layernorm(res_ffn, gamma2, beta2)
-        return ffn_ln_outp
+        # residual
+        X = X + attn
 
-    np_out = bert_layer(X, Wq, Wk, Wv, Wp, W1, W2, gamma1, beta1, gamma2, beta2)
-    breakpoint()
-    np.testing.assert_allclose(allo_out, np_out, atol=1e-3)
-    print("allo Passed!")
-    np.testing.assert_allclose(csim_C, np_out, atol=1e-3)
-    breakpoint()
-    print("Csim Passed!")
-    print(s.build(target="vhls"))
+        x_ln2 = np_layernorm(X, ln2_weight, ln2_bias)
+        mlp_output = linear(x_ln2, mlp_fc_weight, mlp_fc_bias)   
+        mlp_output = gelu(mlp_output)  # GELU 
+        mlp_output = linear(mlp_output, mlp_proj_weight, mlp_proj_bias)  
 
+        X = X + mlp_output
+        return X
 
 if __name__ == "__main__":
     # pytest.main([__file__])
     # test_linear()
     # test_bert()
     # test_mask_softmax_per_head()
-    test_causal_sdp()
+    # test_causal_sdp()
+    test_bias_add()
