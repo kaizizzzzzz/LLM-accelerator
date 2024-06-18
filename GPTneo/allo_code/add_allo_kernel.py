@@ -1,5 +1,5 @@
 "fix_length is L"
-def mask_softmax_per_head[Ty, L](X: "Ty[L, L]", actual_length:"int32[2]") -> "Ty[L, L]":
+def mask_sft_head[Ty, L](X: "Ty[L, L]", actual_length:"int32[2]") -> "Ty[L, L]":
     Z: Ty[L, L]
     E: Ty[L, L]
     S: Ty[L] = 0.0
@@ -36,7 +36,7 @@ def mask_softmax_per_head[Ty, L](X: "Ty[L, L]", actual_length:"int32[2]") -> "Ty
                 Z[i, j] = 0
     return 
 
-def schedule_mask_softmax_per_head(s):
+def schedule_mask_sft_head(s):
     lj = s.get_loops(s.top_func_name)["row_max"]["j"]
     s.pipeline(lj)
     lj = s.get_loops(s.top_func_name)["exp_sum"]["j"]
@@ -46,7 +46,7 @@ def schedule_mask_softmax_per_head(s):
     return s
 
 
-def masked_casual_dot_product_attention[
+def masked_casual_sdp[
     Ty, H, L, D, M0, M1
 ](Q: "Ty[L, D]", K: "Ty[L, D]", V: "Ty[L, D]", actual_length:"int32[2]") -> "Ty[L, D]":
     
@@ -73,7 +73,7 @@ def masked_casual_dot_product_attention[
         # T = Y / dsl.sqrt(s_h[0])
         
         # Need to return a new value
-        S = mask_softmax_per_head[Ty, L, "sft_Y"](Y, actual_length)
+        S = mask_sft_head[Ty, L, "sft_Y"](Y, actual_length)
         # S = softmax[Ty, L, "sft_Y"](Y)
         # YV = (L, L) x (L, D//H) = (L, D//H)
         systolic[Ty, Ty, Ty, L, L, D // H, M0, M1, "YV"](S, V_h, C_h)
