@@ -8,3 +8,5 @@
 8. GPTneo passes atol=1e-2 can pass most time, but atol=1e-3 failed
 9. GPTneo should run with our accelerator if "make hw" passed!
 10. Add some host.cpp template for tesing hw's correctness
+11. our FPGA accelerator for GPTneo can output tokens correctly!!!
+12. We have our first casual accelerator on fpga!!!

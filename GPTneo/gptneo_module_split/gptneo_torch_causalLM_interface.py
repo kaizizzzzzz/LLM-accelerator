@@ -38,9 +38,10 @@ class GPTNeoModel(nn.Module):
             # to numpy, then give to transformer block
             attention_mask = attention_mask.cpu().numpy() 
             hidden_states  = hidden_states.cpu().numpy() 
+            breakpoint()
             for block in self.h:
                 hidden_states = block.forward(hidden_states, attention_mask) #numpy return type
-
+                breakpoint()
             hidden_states = torch.tensor(hidden_states, dtype=torch.float32) # back to torch tensor
             
             hidden_states = self.ln_f(hidden_states)

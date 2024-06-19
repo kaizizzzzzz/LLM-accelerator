@@ -1,6 +1,7 @@
 from transformers import GPT2Tokenizer, GPTNeoForCausalLM as HFGPTNeoForCausalLM
 # from gptneo_torch_causalLM_interface import GPTNeoForCausalLM
-from gptneo_torch_causalLM_interface_allo import GPTNeoForCausalLM
+# from gptneo_torch_causalLM_interface_allo import GPTNeoForCausalLM
+from gptneo_torch_fpga_interface import GPTNeoForCausalLM
 from load_weight_matrix_allo import  initialize_model_from_saved_files
 import torch
 import torch.nn.functional as F
