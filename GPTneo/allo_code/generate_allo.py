@@ -1,7 +1,7 @@
 from transformers import GPT2Tokenizer, GPTNeoForCausalLM as HFGPTNeoForCausalLM
 # from gptneo_torch_causalLM_interface import GPTNeoForCausalLM
 from gptneo_torch_causalLM_interface_allo import GPTNeoForCausalLM
-from load_weight_matrix_allo import initialize_model, initialize_model_from_saved_files
+from load_weight_matrix_allo import  initialize_model_from_saved_files
 import torch
 import torch.nn.functional as F
 import time
@@ -55,7 +55,6 @@ my_model = GPTNeoForCausalLM(config)
 save_weights_and_biases = True
 save_path = "/work/zhang-capra/users/ky427/allo/GPTneo/weights_and_biases/"
 #initialize our numpy mix torch model with real weight
-# my_model = initialize_model(hf_model, my_model, save_weights_and_biases, save_path)
 my_model, all_layer_weights = initialize_model_from_saved_files(my_model, save_path)#test load weight from our saved files
 my_model.transformer.store_layers_weight(all_layer_weights)
 my_model.to(device)

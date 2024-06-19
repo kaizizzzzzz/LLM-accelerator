@@ -23153,7 +23153,7 @@ void GPTNEOLayer(float *v13274, float *v13275, float *v13276, float *v13277,
 #pragma HLS interface m_axi port = v13287 offset = slave bundle = gmem13
 #pragma HLS interface m_axi port = v13288 offset = slave bundle = gmem14
 #pragma HLS interface m_axi port = v13289 offset = slave bundle = gmem15
-  float buf0[64][768]; //
+  float buf0[64][768]; // 43
 l_S_buf0_buf0_l_0:
   for (int buf0_l_0 = 0; buf0_l_0 < 64; buf0_l_0++) { //
   l_buf0_l_1:
@@ -23163,14 +23163,14 @@ l_S_buf0_buf0_l_0:
       buf0[buf0_l_0][buf0_l_1] = v13293;                    //
     }
   }
-  float buf1[768]; //
+  float buf1[768]; // 0.6718
 l_S_buf1_buf1_l_0:
   for (int buf1_l_0 = 0; buf1_l_0 < 768; buf1_l_0++) { //
 #pragma HLS pipeline II = 1 rewind
     float v13296 = v13275[buf1_l_0]; //
     buf1[buf1_l_0] = v13296;         //
   }
-  float buf2[768]; //
+  float buf2[768]; // 0.6718
 l_S_buf2_buf2_l_0:
   for (int buf2_l_0 = 0; buf2_l_0 < 768; buf2_l_0++) { //
 #pragma HLS pipeline II = 1 rewind

@@ -4,12 +4,8 @@ import warnings
 "The transformer block of GPT-Neo implemented in sole numpy"
 "Which can be replaced by our fpga accelerator"
 
-def linear(x, weight, bias=None):
-    # y = np.dot(x, weight.T)
-    y = np.dot(x, weight)  # transpose to conform torch linear, we transpose the weight matrix in advance
-    if bias is not None:
-        y += bias
-    return y
+"here we use all the numpy module tested in the <<allo_test_hls>> folder to compose the transformer block"
+
 
 def np_layernorm(inp, gamma, beta): #replaced with allo "Right[Yes]"
     mean = inp.mean(axis=1)
@@ -27,7 +23,7 @@ def mask_softmax_per_head(x_h, actual_length, fix_length): #apply identical casu
     x_new = np.zeros((fix_length,fix_length), dtype=np.float32)
     store_x_exp = np.zeros((fix_length,fix_length), dtype=np.float32)
     x_new_row_sum = np.zeros(fix_length, dtype=np.float32)
-    x_new_row_max = np.array([-10000] * fix_length, dtype=np.float32) #large enough
+    x_new_row_max = np.array([-100000000] * fix_length, dtype=np.float32) #large enough
 
     "find max value in meaningful tows"
     for i in range(fix_length):
@@ -96,22 +92,22 @@ def GPTNeo_layer(X, ln1_weight, ln1_bias, q_proj_weight, k_proj_weight, v_proj_w
 
     X_ln1 = np_layernorm(X, ln1_weight, ln1_bias)
 
-    Q = linear(X_ln1, q_proj_weight)
-    K = linear(X_ln1, k_proj_weight)
-    V = linear(X_ln1, v_proj_weight)
+    Q = np.matmul(X_ln1, q_proj_weight)
+    K = np.matmul(X_ln1, k_proj_weight)
+    V = np.matmul(X_ln1, v_proj_weight)
     # breakpoint()
 
     attn = causal_sdp(Q, K, V, H, D, L, actual_length)
     
-    attn = linear(attn, out_proj_weight, out_proj_bias)
+    attn = np.matmul(attn, out_proj_weight) + out_proj_bias
 
     # residual
     X = X + attn
 
     x_ln2 = np_layernorm(X, ln2_weight, ln2_bias)
-    mlp_output = linear(x_ln2, mlp_fc_weight, mlp_fc_bias)   
+    mlp_output = np.matmul(x_ln2, mlp_fc_weight) + mlp_fc_bias   
     mlp_output = gelu(mlp_output)  # GELU 
-    mlp_output = linear(mlp_output, mlp_proj_weight, mlp_proj_bias)  
+    mlp_output = np.matmul(mlp_output, mlp_proj_weight) + mlp_proj_bias  
 
     X = X + mlp_output
     return X

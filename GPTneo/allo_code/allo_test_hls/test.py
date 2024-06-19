@@ -368,7 +368,7 @@ def test_GPTneo():
     s.compose(systolic, id="YV", instantiate=[float32, float32, float32, L, D, D, M0, M1])
     s.compose(mask_sft_head, id="sft_Y" ,instantiate=[float32, L])
 
-    hls_mod = s.build(target="vitis_hls",mode="csim", project="GPTneo.prj")
+    hls_mod = s.build(target="vitis_hls",mode="csim", project="GPTneo_small_verify.prj")
     csim_C = np.zeros((L , D), dtype=np.float32)
     hls_mod(
         X,

@@ -23153,7 +23153,7 @@ void GPTNEOLayer(float *v13274, float *v13275, float *v13276, float *v13277,
 #pragma HLS interface m_axi port = v13287 offset = slave bundle = gmem13
 #pragma HLS interface m_axi port = v13288 offset = slave bundle = gmem14
 #pragma HLS interface m_axi port = v13289 offset = slave bundle = gmem15
-  float buf0[64][768]; //
+  float buf0[64][768]; // 43.69
 l_S_buf0_buf0_l_0:
   for (int buf0_l_0 = 0; buf0_l_0 < 64; buf0_l_0++) { //
   l_buf0_l_1:
@@ -23163,14 +23163,14 @@ l_S_buf0_buf0_l_0:
       buf0[buf0_l_0][buf0_l_1] = v13293;                    //
     }
   }
-  float buf1[768]; //
+  float buf1[768]; // 0.68
 l_S_buf1_buf1_l_0:
   for (int buf1_l_0 = 0; buf1_l_0 < 768; buf1_l_0++) { //
 #pragma HLS pipeline II = 1 rewind
     float v13296 = v13275[buf1_l_0]; //
     buf1[buf1_l_0] = v13296;         //
   }
-  float buf2[768]; //
+  float buf2[768]; // 0.68
 l_S_buf2_buf2_l_0:
   for (int buf2_l_0 = 0; buf2_l_0 < 768; buf2_l_0++) { //
 #pragma HLS pipeline II = 1 rewind
@@ -23210,7 +23210,7 @@ l_S_buf5_buf5_l_0:
       buf5[buf5_l_0][buf5_l_1] = v13311;                    //
     }
   }
-  float buf6[768][768]; //
+  float buf6[768][768]; // 0.68
 #pragma HLS BIND_STORAGE variable = buf6 type = ram_2p impl = uram
 l_S_buf6_buf6_l_0:
   for (int buf6_l_0 = 0; buf6_l_0 < 768; buf6_l_0++) { //
@@ -23221,21 +23221,21 @@ l_S_buf6_buf6_l_0:
       buf6[buf6_l_0][buf6_l_1] = v13315;                    //
     }
   }
-  float buf7[768]; //
+  float buf7[768]; // 0.68
 l_S_buf7_buf7_l_0:
   for (int buf7_l_0 = 0; buf7_l_0 < 768; buf7_l_0++) { //
 #pragma HLS pipeline II = 1 rewind
     float v13318 = v13281[buf7_l_0]; //
     buf7[buf7_l_0] = v13318;         //
   }
-  float buf8[768]; //
+  float buf8[768]; // 0.68
 l_S_buf8_buf8_l_0:
   for (int buf8_l_0 = 0; buf8_l_0 < 768; buf8_l_0++) { //
 #pragma HLS pipeline II = 1 rewind
     float v13321 = v13282[buf8_l_0]; //
     buf8[buf8_l_0] = v13321;         //
   }
-  float buf9[768]; //
+  float buf9[768]; // 0.68
 l_S_buf9_buf9_l_0:
   for (int buf9_l_0 = 0; buf9_l_0 < 768; buf9_l_0++) { //
 #pragma HLS pipeline II = 1 rewind
@@ -23253,7 +23253,7 @@ l_S_buf10_buf10_l_0:
       buf10[buf10_l_0][buf10_l_1] = v13328;                    //
     }
   }
-  float buf11[3072]; //
+  float buf11[3072]; // 2.72
 l_S_buf11_buf11_l_0:
   for (int buf11_l_0 = 0; buf11_l_0 < 3072; buf11_l_0++) { //
 #pragma HLS pipeline II = 1 rewind
@@ -23271,7 +23271,7 @@ l_S_buf12_buf12_l_0:
       buf12[buf12_l_0][buf12_l_1] = v13335;                   //
     }
   }
-  float buf13[768]; //
+  float buf13[768]; // 0.68
 l_S_buf13_buf13_l_0:
   for (int buf13_l_0 = 0; buf13_l_0 < 768; buf13_l_0++) { //
 #pragma HLS pipeline II = 1 rewind
@@ -23285,7 +23285,7 @@ l_S_buf14_buf14_l_0:
     int32_t v13341 = v13288[buf14_l_0]; //
     buf14[buf14_l_0] = v13341;          //
   }
-  float v13342[64][768];
+  float v13342[64][768];                           // 43.6
   layer_norm(buf0, buf1, buf2, v13342);            // L17453
   float Q[64][768];                                // L17456
   for (int v13344 = 0; v13344 < 64; v13344++) {    // L17457
@@ -23293,57 +23293,57 @@ l_S_buf14_buf14_l_0:
       Q[v13344][v13345] = 0.000000;                // L17457
     }
   }
-  float K[64][768];                                // L17458
+  float K[64][768]; // 43.6                               // L17458
   for (int v13347 = 0; v13347 < 64; v13347++) {    // L17459
     for (int v13348 = 0; v13348 < 768; v13348++) { // L17459
       K[v13347][v13348] = 0.000000;                // L17459
     }
   }
-  float V[64][768];                                // L17460
+  float V[64][768]; // 43.6                              // L17460
   for (int v13350 = 0; v13350 < 64; v13350++) {    // L17461
     for (int v13351 = 0; v13351 < 768; v13351++) { // L17461
       V[v13350][v13351] = 0.000000;                // L17461
     }
   }
-  systolic_Q(v13342, buf3, Q); // L17462
-  systolic_K(v13342, buf4, K); // L17463
-  systolic_V(v13342, buf5, V); // L17464
-  float v13352[64][768];
-  masked_casual_sdp(Q, K, V, buf14, v13352);       // L17465
-  float O_proj[64][768];                           // L17466
+  systolic_Q(v13342, buf3, Q);               // L17462
+  systolic_K(v13342, buf4, K);               // L17463
+  systolic_V(v13342, buf5, V);               // L17464
+  float v13352[64][768];                     // 43.6
+  masked_casual_sdp(Q, K, V, buf14, v13352); // L17465
+  float O_proj[64][768]; // 43.6                           // L17466
   for (int v13354 = 0; v13354 < 64; v13354++) {    // L17467
     for (int v13355 = 0; v13355 < 768; v13355++) { // L17467
       O_proj[v13354][v13355] = 0.000000;           // L17467
     }
   }
-  systolic_P(v13352, buf6, O_proj); // L17468
-  float v13356[64][768];
-  bias_add(O_proj, buf7, v13356); // L17469
-  float v13357[64][768];
-  residual_add(buf0, v13356, v13357); // L17470
-  float v13358[64][768];
-  layer_norm(v13357, buf8, buf9, v13358);           // L17471
-  float mlp1[64][3072];                             // L17472
+  systolic_P(v13352, buf6, O_proj);       // L17468
+  float v13356[64][768];                  // 43.6
+  bias_add(O_proj, buf7, v13356);         // L17469
+  float v13357[64][768];                  // 43.6
+  residual_add(buf0, v13356, v13357);     // L17470
+  float v13358[64][768];                  // 43.6
+  layer_norm(v13357, buf8, buf9, v13358); // L17471
+  float mlp1[64][3072]; // 174.4                         // L17472
   for (int v13360 = 0; v13360 < 64; v13360++) {     // L17473
     for (int v13361 = 0; v13361 < 3072; v13361++) { // L17473
       mlp1[v13360][v13361] = 0.000000;              // L17473
     }
   }
   systolic_ffn1(v13358, buf10, mlp1); // L17474
-  float v13362[64][3072];
-  bias_add_1(mlp1, buf11, v13362); // L17475
-  float v13363[64][3072];
-  GeLU(v13362, v13363);                            // L17476
-  float mlp2[64][768];                             // L17477
+  float v13362[64][3072];             // 174.4
+  bias_add_1(mlp1, buf11, v13362);    // L17475
+  float v13363[64][3072];             // 174.4
+  GeLU(v13362, v13363);               // L17476
+  float mlp2[64][768];                // 43.6                       // L17477
   for (int v13365 = 0; v13365 < 64; v13365++) {    // L17478
     for (int v13366 = 0; v13366 < 768; v13366++) { // L17478
       mlp2[v13365][v13366] = 0.000000;             // L17478
     }
   }
-  systolic_ffn2(v13363, buf12, mlp2); // L17479
-  float v13367[64][768];
-  bias_add(mlp2, buf13, v13367); // L17480
-  float v13368[64][768];
+  systolic_ffn2(v13363, buf12, mlp2);   // L17479
+  float v13367[64][768];                // 43.6
+  bias_add(mlp2, buf13, v13367);        // L17480
+  float v13368[64][768];                // 43.6
   residual_add(v13357, v13367, v13368); // L17481
 l_S_result15_result15_l_0:
   for (int result15_l_0 = 0; result15_l_0 < 64; result15_l_0++) { //
