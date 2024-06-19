@@ -7,3 +7,4 @@
 7. bias_add passed Csim!
 8. GPTneo passes atol=1e-2 can pass most time, but atol=1e-3 failed
 9. GPTneo should run with our accelerator if "make hw" passed!
+10. Add some host.cpp file for tesing hw's correctness
